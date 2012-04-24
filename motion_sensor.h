@@ -735,6 +735,7 @@ void LIS302DL_RebootCmd(void);
 void LIS302DL_ReadACC(int32_t* out);
 void LIS302DL_Write(uint8_t* pBuffer, uint8_t WriteAddr, uint16_t NumByteToWrite);
 void LIS302DL_Read(uint8_t* pBuffer, uint8_t ReadAddr, uint16_t NumByteToRead);
+int InitMotionSensor (void);
 
 /* USER Callbacks: This is function for which prototype only is declared in
    MEMS accelerometre driver and that should be implemented into user applicaiton. */  

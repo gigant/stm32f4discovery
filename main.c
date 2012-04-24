@@ -1,6 +1,7 @@
  #include "stm32f4xx.h"
  #include "motion_sensor.h"
 
+
 int main(void)
 { 
     /* Structure for port init */
