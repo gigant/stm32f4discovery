@@ -1,0 +1,8 @@
+
+*.dep
+*.ewd
+
+bin/*
+
+/EWARM/Bin
+/EWARM/settings
