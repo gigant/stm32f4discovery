@@ -1,7 +1,8 @@
  #include "stm32f4xx.h"
+ #include "motion_sensor.h"
 
 int main(void)
-{
+{ 
     /* Structure for port init */
   GPIO_InitTypeDef  GPIO_InitStructure;
   
@@ -18,9 +19,14 @@ int main(void)
   
   GPIOD->BSRRH =GPIO_Pin_12; //off led4
   GPIOD->BSRRL = GPIO_Pin_12; //on led4
+  
+  //конфигурирование портов, инициализация контроллера
+  InitMotionSensor();
+  
   while (1)
   {
   }
+
 }
 
 #ifdef  USE_FULL_ASSERT

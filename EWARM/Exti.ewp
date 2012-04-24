@@ -933,6 +933,9 @@
       <name>$PROJ_DIR$\..\main.c</name>
     </file>
     <file>
+      <name>$PROJ_DIR$\..\motion_sensor.c</name>
+    </file>
+    <file>
       <name>$PROJ_DIR$\..\system_stm32f4xx.c</name>
     </file>
   </group>
