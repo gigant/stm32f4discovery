@@ -12,7 +12,7 @@
 #include "motion_sensor.h"
 
 
-int InitMotionSensor (void)
+int InitMotionSensor (LIS302DL_InitTypeDef *LIS302DL_InitStruct)
 {
 
   //Определяем структуру для  конфигурации выводов
@@ -102,11 +102,108 @@ int InitMotionSensor (void)
                     LIS302DL_InitStruct->Axes_Enable);
   
   /* Записать сконфигурированый байт в CTRL_REG1 регистр */
-  LIS302DL_Write(&ctrl, LIS302DL_CTRL_REG1_ADDR, 1);
+  MotionSensorWrite(&ctrl, LIS302DL_CTRL_REG1_ADDR, 1);
+  
+  
   
   
   //конфигурация закончена
   
   
 return 0;
+}
+
+
+
+
+
+/*Отправляет байт по SPI и возвращает байт принятый*/
+uint8_t MotionSensorSendByte(uint8_t byte)
+
+{
+
+  /* Loop while DR register in not emplty */
+  uint32_t LIS302DLTimeout = 0x1000;  //Это значение надо как-то выбрать исходя из частоты, но я забил и взял вот такое.
+  while (SPI_I2S_GetFlagStatus(LIS302DL_SPI, SPI_I2S_FLAG_TXE) == RESET)/*цикл крутиться пока TransmitBuferEmti е станет равным SET*/
+  {
+    if((LIS302DLTimeout--) == 0) return 0; //по идее вместо ретурн 0 надо вызывать функцию сброса и переконфигурации
+  }
+  
+  /* послать byte по SPI LIS302DL_SPI */
+  SPI_I2S_SendData(LIS302DL_SPI, byte);
+  
+  /* Ждем приема байта */
+  LIS302DLTimeout = 0x1000;
+  while (SPI_I2S_GetFlagStatus(LIS302DL_SPI, SPI_I2S_FLAG_RXNE) == RESET)//куримся пока в ресив буфере что-то не появится.
+  {
+    if((LIS302DLTimeout--) == 0) return 0; //по идее вместо ретурн 0 надо вызывать функцию сброса и переконфигурации
+  }
+  
+  /* возвращаем принятое значение */
+  return (uint8_t)SPI_I2S_ReceiveData(LIS302DL_SPI);
+}
+
+
+void MotionSensorWrite (uint8_t* pBuffer, uint8_t WriteAddr, uint16_t NumByteToWrite)
+{
+/* Configure the MS bit: 
+       - When 0, the address will remain unchanged in multiple read/write commands.
+       - When 1, the address will be auto incremented in multiple read/write commands.
+  */
+  if(NumByteToWrite > 0x01)
+  {
+    WriteAddr |= 0x40;//0x40 = 100000 устанавливает бит MS
+  }
+  /* Для начала записи устанавливаем низкий уровень на чип селект */
+ GPIO_ResetBits(LIS302DL_SPI_CS_GPIO_PORT, LIS302DL_SPI_CS_PIN);
+  
+  /* Send the Address of the indexed register */
+  MotionSensorSendByte(WriteAddr);
+  /* Send the data that will be written into the device (MSB First) */
+  while(NumByteToWrite >= 0x01)
+  {
+    MotionSensorSendByte(*pBuffer);
+    NumByteToWrite--;
+    pBuffer++;
+  }
+  
+  /* конец записи, выставляем высокий уровень на чип селект */ 
+  GPIO_SetBits(LIS302DL_SPI_CS_GPIO_PORT, LIS302DL_SPI_CS_PIN);
+}
+
+/**
+  * @brief  Reads a block of data from the LIS302DL.
+  * @param  pBuffer : pointer to the buffer that receives the data read from the LIS302DL.
+  * @param  ReadAddr : LIS302DL's internal address to read from.
+  * @param  NumByteToRead : number of bytes to read from the LIS302DL.
+  * @retval None
+  */
+void MotionSensorRead(uint8_t* pBuffer, uint8_t ReadAddr, uint16_t NumByteToRead)
+{  
+  if(NumByteToRead > 0x01)
+  {
+    ReadAddr |= (uint8_t)(0x80 | 0x40); //установить биты RW, MS
+  }
+  else
+  {
+    ReadAddr |= 0x80; //установить RW
+  }
+  
+  /* Для начала записи устанавливаем низкий уровень на чип селект */
+ GPIO_ResetBits(LIS302DL_SPI_CS_GPIO_PORT, LIS302DL_SPI_CS_PIN);
+  
+  /* Send the Address of the indexed register */
+  MotionSensorSendByte(ReadAddr);
+  
+  /* Receive the data that will be read from the device (MSB First) */
+  while(NumByteToRead > 0x00)
+  {
+    /* Send dummy byte (0x00) to generate the SPI clock to LIS302DL (Slave device) */
+    *pBuffer = MotionSensorSendByte(0x00);
+    NumByteToRead--;
+    pBuffer++;
+  }
+  
+  /* конец записи, выставляем высокий уровень на чип селект */ 
+  GPIO_SetBits(LIS302DL_SPI_CS_GPIO_PORT, LIS302DL_SPI_CS_PIN);
 }

@@ -1,5 +1,5 @@
 /**
-  ******************************************************************************
+******************************************************************************
   * @file    stm32f4_discovery_lis302dl.h
   * @author  MCD Application Team
   * @version V1.1.0
@@ -725,7 +725,6 @@ typedef struct
 /** @defgroup STM32F4_DISCOVERY_LIS302DL_Exported_Functions
   * @{
   */ 
-void LIS302DL_Init(LIS302DL_InitTypeDef *LIS302DL_InitStruct);
 void LIS302DL_InterruptConfig(LIS302DL_InterruptConfigTypeDef *LIS302DL_InterruptConfigStruct);
 void LIS302DL_FilterConfig(LIS302DL_FilterConfigTypeDef *LIS302DL_FilterConfigStruct);
 void LIS302DL_LowpowerCmd(uint8_t LowPowerMode);
@@ -733,9 +732,9 @@ void LIS302DL_FullScaleCmd(uint8_t FS_value);
 void LIS302DL_DataRateCmd(uint8_t DataRateValue);
 void LIS302DL_RebootCmd(void);
 void LIS302DL_ReadACC(int32_t* out);
-void LIS302DL_Write(uint8_t* pBuffer, uint8_t WriteAddr, uint16_t NumByteToWrite);
-void LIS302DL_Read(uint8_t* pBuffer, uint8_t ReadAddr, uint16_t NumByteToRead);
-int InitMotionSensor (void);
+void MotionSensorWrite(uint8_t* pBuffer, uint8_t WriteAddr, uint16_t NumByteToWrite);
+void MotionSensorRead(uint8_t* pBuffer, uint8_t ReadAddr, uint16_t NumByteToRead);
+int InitMotionSensor (LIS302DL_InitTypeDef *LIS302DL_InitStruct);
 
 /* USER Callbacks: This is function for which prototype only is declared in
    MEMS accelerometre driver and that should be implemented into user applicaiton. */  
