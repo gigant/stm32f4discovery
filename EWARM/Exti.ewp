@@ -933,6 +933,12 @@
   <group>
     <name>User Code</name>
     <file>
+      <name>$PROJ_DIR$\..\LCD.c</name>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\led.c</name>
+    </file>
+    <file>
       <name>$PROJ_DIR$\..\main.c</name>
     </file>
     <file>

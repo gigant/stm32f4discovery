@@ -1,25 +1,15 @@
  #include "stm32f4xx.h"
 #include "motion_sensor.h"
-
+#include "LCD.h"
+#include "led.h"
 
 int main(void)
 { 
-    /* Structure for port init */
-  GPIO_InitTypeDef  GPIO_InitStructure;
-  
+  ledInit ();
+  ledOff(LEDALL);
   //Структура для инициализации датчика движения
   LIS302DL_InitTypeDef  LIS302DL_InitStruct;
   
-  /* Enable the GPIOD Clock on port D connected led */
-  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
-
-  /* Configure the GPIOD */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(GPIOD, &GPIO_InitStructure);
   
   
   
@@ -35,16 +25,22 @@ int main(void)
     
   InitMotionSensor(&LIS302DL_InitStruct);
   
-  uint8_t pBuf;
+ // uint8_t pBuf;
  
-  
+  //lcd3310_init_pins();
+  //lcd3310_init();
+  //lcd3310_send_byte(DC_DATA,0xFF);
   while (1)
   {
-    MotionSensorRead (&pBuf,0x29,1);
+    /*MotionSensorRead (&pBuf,0x29,1);
     if (pBuf > 0xDF) { GPIOD->BSRRL = GPIO_Pin_12;} //on led4
-    if (pBuf <0xD0) {GPIOD->BSRRH =GPIO_Pin_12;} //off led4
+    if (pBuf <0xD0) {GPIOD->BSRRH =GPIO_Pin_12;} //off led4*/
+      
+   // delay_ns(100000);    
   }
 
+  
+  
 }
 
 #ifdef  USE_FULL_ASSERT
