@@ -2,6 +2,8 @@
 #include "motion_sensor.h"
 #include "LCD.h"
 #include "led.h"
+#include "Buttons.h"
+
 
 int main(void)
 { 
@@ -9,10 +11,17 @@ int main(void)
   ledOff(LEDALL);
   //Структура для инициализации датчика движения
   LIS302DL_InitTypeDef  LIS302DL_InitStruct;
+ 
+ // ledOn(LED3);
+  ledInvert(LED3);
   
-  
-  
-  
+  //Конфигурация SysTick для функции задержки
+  //Reload Value = SysTick Counter Clock (Hz) x  Desired Time base (s)
+  if (SysTick_Config(SystemCoreClock/100000))
+  { 
+    /* Capture error */ 
+    while (1);
+  }
   
   //конфигурирование портов, инициализация контроллера
   
@@ -25,23 +34,41 @@ int main(void)
     
   InitMotionSensor(&LIS302DL_InitStruct);
   
- // uint8_t pBuf;
+  
+  uint8_t pBuf;
  
-  //lcd3310_init_pins();
-  //lcd3310_init();
-  //lcd3310_send_byte(DC_DATA,0xFF);
+  lcd3310_init_pins();
+  lcd3310_init();
+  lcd3310_clear();
+  
+  //передвинуть курсор в начало
+  lcd3310_send_byte(0x40,DC_CMD);
+  lcd3310_send_byte(0x80,DC_CMD);
+ 
+
   while (1)
-  {
-    /*MotionSensorRead (&pBuf,0x29,1);
+  {  
+    //передвинуть курсор в начало
+  lcd3310_send_byte(0x40,DC_CMD);
+  lcd3310_send_byte(0x80,DC_CMD);
+  
+  //Берем данные из датчика
+  MotionSensorRead (&pBuf,0x29,1);
+  
+  
+  lcd3310_print_hex(pBuf);
+ 
     if (pBuf > 0xDF) { GPIOD->BSRRL = GPIO_Pin_12;} //on led4
     if (pBuf <0xD0) {GPIOD->BSRRH =GPIO_Pin_12;} //off led4*/
-      
-   // delay_ns(100000);    
+    Delay(1000*10);
+    ledInvert(LED3);
+       
   }
 
   
   
 }
+
 
 #ifdef  USE_FULL_ASSERT
 

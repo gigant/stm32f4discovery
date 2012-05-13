@@ -1,3 +1,4 @@
+
 #include "led.h"
 
 
@@ -27,12 +28,17 @@ void ledOn(uint16_t led)
 //потушить светодиод
 void ledOff (uint16_t led)
 {
-  
+
   (GPIOD->BSRRH) =led; 
 }
 
 //инанртировать состояние светодиода
 void ledInvert (uint16_t led)
-{
-//потом напишу
+{  int val=GPIOD->ODR;
+
+ if ( val) 
+   ledOff(led);
+ else 
+   ledOn(led);
 }
+
