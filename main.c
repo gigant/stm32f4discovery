@@ -1,4 +1,7 @@
  #include "stm32f4xx.h"
+#include "hc_05\hc05.h"
+
+
 
 int main(void)
 {
@@ -18,6 +21,7 @@ int main(void)
   
   GPIOD->BSRRH =GPIO_Pin_12; //off led4
   GPIOD->BSRRL = GPIO_Pin_12; //on led4
+  hc05_init();
   while (1)
   {
   }

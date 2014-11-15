@@ -930,6 +930,9 @@
   <group>
     <name>User Code</name>
     <file>
+      <name>$PROJ_DIR$\..\hc_05\hc05.c</name>
+    </file>
+    <file>
       <name>$PROJ_DIR$\..\main.c</name>
     </file>
     <file>

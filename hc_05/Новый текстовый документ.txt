@@ -1,0 +1,105 @@
+/*
+ * Author: Edoardo De Marchi
+ * Date: 12-08-14
+ * Notes: HC05 AT command
+*/
+ 
+#include "mbed.h"
+#include "MODSERIAL.h"
+ 
+ 
+MODSERIAL pc(USBTX, USBRX); 
+DigitalOut led1(LED1);
+ 
+    
+#if   defined(TARGET_LPC1768)
+MODSERIAL blue(p9, p10);          // TX = P9  RX = P10
+//MODSERIAL blue(p13, p14);         // TX = P13  RX = P14
+#elif defined(TARGET_LPC4330_M4)
+MODSERIAL blue(UART0_TX, UART0_RX);        // P6_4, P6_5
+//MODSERIAL blue(UART3_TX, UART3_RX);        // P2_3, P2_4
+#endif
+ 
+ 
+ 
+ 
+bool new_send = false;
+bool new_response = false;
+char ATCmd[80];
+char blueChar[80];
+ 
+ 
+void commandAT(char *v)         // Send the AT command
+{        
+ 
+  int i=0;
+  
+  while(v[i] != NULL)
+  { 
+    blue.putc(v[i]);
+    i++;
+  } 
+  blue.printf("\r\n");
+}
+ 
+ 
+// This function is called when a character goes into the RX buffer.
+void rxBlueCallback(MODSERIAL_IRQ_INFO *q) 
+{
+    new_response = true;
+}
+ 
+// This function is called when a character goes into the RX buffer.
+void rxPcCallback(MODSERIAL_IRQ_INFO *q) 
+{
+    new_send = true;
+}
+ 
+ 
+int main()
+{
+   blue.baud(38400);
+   pc.baud(115200);
+   
+   blue.attach(&rxBlueCallback);
+   pc.attach(&rxPcCallback);
+    
+   pc.printf("AT Mode Start\r\n"); 
+   int i = 0;
+   
+   while(1)
+   {
+        if(new_send)
+        {
+            int i = 0;
+        
+            while(pc.readable())
+            {
+                ATCmd[i] = pc.getc();
+                i++;
+            }
+            commandAT(ATCmd);
+            memset(ATCmd, 0, sizeof(ATCmd));
+            new_send = false;
+        }else
+        if(new_response)
+        {
+            int i = 0;
+            while(blue.readable())
+            {
+                blueChar[i] = blue.getc();
+                i++;
+            }
+            printf("Response: %s", blueChar); 
+            memset(blueChar, 0, sizeof(blueChar)); 
+            new_response = false;   
+        }    
+        wait_ms(100);
+        i++;
+        if(i == 5)
+        {
+            led1 = !led1;
+            i=0;    
+        }
+    } 
+}
