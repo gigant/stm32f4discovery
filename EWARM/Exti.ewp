@@ -913,6 +913,18 @@
     </settings>
   </configuration>
   <group>
+    <name>Addons</name>
+    <file>
+      <name>$PROJ_DIR$\..\Addons\gpio.c</name>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\Addons\timers.c</name>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\Addons\wheels.c</name>
+    </file>
+  </group>
+  <group>
     <name>EWARM</name>
     <file>
       <name>$PROJ_DIR$\..\Libraries\CMSIS\ST\STM32F4xx\Source\Templates\iar\startup_stm32f4xx.s</name>
@@ -925,6 +937,9 @@
     </file>
     <file>
       <name>$PROJ_DIR$\..\Libraries\STM32F4xx_StdPeriph_Driver\src\stm32f4xx_rcc.c</name>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\Libraries\STM32F4xx_StdPeriph_Driver\src\stm32f4xx_tim.c</name>
     </file>
   </group>
   <group>

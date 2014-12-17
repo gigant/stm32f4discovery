@@ -6,3 +6,14 @@ bin/*
 
 /EWARM/Bin
 /EWARM/settings
+/EWARM/Bin/Exe/Exti.out
+/EWARM/Bin/Exe/stm.out
+/EWARM/Bin/Exe/stm.sim
+/EWARM/Bin/List/Exti.map
+/EWARM/Bin/List/stm.map
+/EWARM/Bin/Obj/Exti.pbd
+/EWARM/Bin/Obj/main.o
+/EWARM/Bin/Obj/startup_stm32f4xx.o
+/EWARM/Bin/Obj/stm32f4xx_gpio.o
+/EWARM/Bin/Obj/stm32f4xx_rcc.o
+/EWARM/Bin/Obj/system_stm32f4xx.o

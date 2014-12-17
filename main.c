@@ -1,23 +1,19 @@
  #include "stm32f4xx.h"
+ #include "Addons\wheels.h"
+
+#define RedLed GPIO_Pin_14
+#define GreenLed GPIO_Pin_12
 
 int main(void)
 {
-    /* Structure for port init */
-  GPIO_InitTypeDef  GPIO_InitStructure;
+  int init_err =0; 
   
-  /* Enable the GPIOD Clock on port D connected led */
-  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
-
-  /* Configure the GPIOD */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(GPIOD, &GPIO_InitStructure);
+  init_err = wheels_init();
   
-  GPIOD->BSRRH =GPIO_Pin_12; //off led4
-  GPIOD->BSRRL = GPIO_Pin_12; //on led4
+  
+  if (!init_err) GPIO_SetBits (GPIOD, GreenLed);
+                 else GPIO_SetBits (GPIOD, RedLed);
+  
   while (1)
   {
   }
