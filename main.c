@@ -7,7 +7,7 @@
 int main(void)
 {
   int init_err =0; 
-  
+  int i=0;
   init_err = wheels_init();
   
   
@@ -16,6 +16,8 @@ int main(void)
   
   while (1)
   {
+    if(GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_0)==Bit_SET) wheel_faster();
+    for (i = 0; i < 100000; i++);
   }
 }
 
