@@ -19,9 +19,17 @@ int wheels_init(void)
 {
   gpio_init();
   TimersInit();
+  set_speed(0,0);
   
   return 0;
 };
+
+void wheel_set_speed(int speed_left,int speed_right)
+{
+  
+  return
+}
+
 
 void wheel_faster(void)
 {

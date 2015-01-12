@@ -3,15 +3,14 @@
 /*
 порт A  
 порт B
-pb9 - ШИМ левое колесо
-порт C
-pc13 - направление правое колесо
+pb4 - in1 ШИМ правое вперед
+pb7 - in4 ШИМ левое колесо назад
+pb9 - in3 ШИМ левое колесо вперед
 
 порт D
 pd12 - зеленый светодиод
 порт E
-pe1 - направление левого колеса
-pe5 - ШИМ правое колесо
+pe5 - in2 ШИМ правое колесо назад
 порт H
 порт I
 
@@ -25,7 +24,7 @@ int gpio_init (void)
   /* структура для инициализации порта */
   GPIO_InitTypeDef  GPIO_InitStructure;
  
-  /* включаем тактирующие импульсы на портах A,C,D,E */
+  /* включаем тактирующие импульсы на портах A,B,D,E */
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);  
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
@@ -42,14 +41,16 @@ int gpio_init (void)
   GPIO_Init(GPIOA, &GPIO_InitStructure);
   
   /*конфигурирование GPIOB*/
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9 | GPIO_Pin_7 | GPIO_Pin_4;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_Init(GPIOB, &GPIO_InitStructure);
   
+  GPIO_PinAFConfig (GPIOB, GPIO_PinSource7, GPIO_AF_TIM4);  // к PB9 подключен TIM11_CH1
   GPIO_PinAFConfig (GPIOB, GPIO_PinSource9, GPIO_AF_TIM11);  // к PB9 подключен TIM11_CH1
+    GPIO_PinAFConfig (GPIOB, GPIO_PinSource4, GPIO_AF_TIM3);  // к PB4 подключен TIM3_CH1
   /*конфигурирование GPIOC*/
   
   /*конфигурирование GPIOD*/
@@ -61,7 +62,7 @@ int gpio_init (void)
   GPIO_Init(GPIOD, &GPIO_InitStructure);
   /*конфигурирование GPIOE*/
   
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3 | GPIO_Pin_1;
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
