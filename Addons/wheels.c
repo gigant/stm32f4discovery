@@ -14,12 +14,16 @@
 #include "wheels.h"
 
 #include "stm32f4xx_tim.h"
-extern int pulse=0;
+//int pulse=0;
+
+void wheel_set_speed(int,int);
+
 int wheels_init(void)
 {
   gpio_init();
   TimersInit();
-  set_speed(0,0);
+  wheel_set_speed(0,0);
+  
   
   return 0;
 };
@@ -27,14 +31,14 @@ int wheels_init(void)
 void wheel_set_speed(int speed_left,int speed_right)
 {
   
-  return
+  return;
 }
 
 
 void wheel_faster(void)
 {
         
-        pulse +=6;
+       // pulse +=6;
         TimersInit();
    
 };

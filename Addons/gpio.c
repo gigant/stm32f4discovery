@@ -48,9 +48,9 @@ int gpio_init (void)
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_Init(GPIOB, &GPIO_InitStructure);
   
-  GPIO_PinAFConfig (GPIOB, GPIO_PinSource7, GPIO_AF_TIM4);  // к PB9 подключен TIM11_CH1
+  GPIO_PinAFConfig (GPIOB, GPIO_PinSource7, GPIO_AF_TIM4);  // к PB7 подключен TIM11_CH1
   GPIO_PinAFConfig (GPIOB, GPIO_PinSource9, GPIO_AF_TIM11);  // к PB9 подключен TIM11_CH1
-    GPIO_PinAFConfig (GPIOB, GPIO_PinSource4, GPIO_AF_TIM3);  // к PB4 подключен TIM3_CH1
+  GPIO_PinAFConfig (GPIOB, GPIO_PinSource4, GPIO_AF_TIM3);  // к PB4 подключен TIM3_CH1
   /*конфигурирование GPIOC*/
   
   /*конфигурирование GPIOD*/
@@ -62,7 +62,7 @@ int gpio_init (void)
   GPIO_Init(GPIOD, &GPIO_InitStructure);
   /*конфигурирование GPIOE*/
   
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
+ /* GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
@@ -76,7 +76,7 @@ int gpio_init (void)
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_Init(GPIOE, &GPIO_InitStructure);
   
-  GPIO_PinAFConfig (GPIOE, GPIO_PinSource5, GPIO_AF_TIM9);  // к PE5 подключен TIM9_CH1
+  GPIO_PinAFConfig (GPIOE, GPIO_PinSource5, GPIO_AF_TIM9); */ // к PE5 подключен TIM9_CH1
   /*конфигурирование GPIOH*/
   /*конфигурирование GPIOI*/
 

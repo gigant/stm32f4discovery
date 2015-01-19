@@ -1,6 +1,6 @@
 
 #include "stm32f4xx_tim.h"
-extern int pulse;
+int pulse = 0;
 
 void TimersInit(void)
 {
@@ -25,7 +25,7 @@ void TimersInit(void)
         TIM_OC1PreloadConfig(TIM9, TIM_OCPreload_Enable);
         
         TIM_ARRPreloadConfig(TIM9,ENABLE);
-        TIM_Cmd(TIM9,ENABLE);   // запускаем счёт
+        TIM_Cmd(TIM9,ENABLE);   // запускаем счёт*/
         
         //////////////////////////////////////////////////////////////////////////
         
@@ -49,9 +49,9 @@ void TimersInit(void)
         TIM_OC1PreloadConfig(TIM11, TIM_OCPreload_Enable);
         
         TIM_ARRPreloadConfig(TIM11,ENABLE);
-        TIM_Cmd(TIM11,ENABLE);   // запускаем счёт
+        TIM_Cmd(TIM11,ENABLE);   // запускаем счёт*/
         //////////////////////////////////////////////////////////////////////
-        RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM4, ENABLE);
+        RCC_APB2PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
         
         TIM_TimeBaseInitTypeDef base_timer3;
         TIM_TimeBaseStructInit(&base_timer3);
