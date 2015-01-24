@@ -9,8 +9,8 @@
     pe5 - направление
 */
 
-#include "gpio.h"
-#include "timers.h"
+#include "drivers/gpio.h"
+#include "drivers/timers.h"
 #include "wheels.h"
 
 #include "stm32f4xx_tim.h"

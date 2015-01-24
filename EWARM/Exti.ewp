@@ -913,15 +913,15 @@
     </settings>
   </configuration>
   <group>
-    <name>Addons</name>
+    <name>drivers</name>
     <file>
-      <name>$PROJ_DIR$\..\Addons\gpio.c</name>
+      <name>$PROJ_DIR$\..\drivers\gpio.c</name>
     </file>
     <file>
-      <name>$PROJ_DIR$\..\Addons\timers.c</name>
+      <name>$PROJ_DIR$\..\drivers\mpu6050.c</name>
     </file>
     <file>
-      <name>$PROJ_DIR$\..\Addons\wheels.c</name>
+      <name>$PROJ_DIR$\..\drivers\timers.c</name>
     </file>
   </group>
   <group>
@@ -934,6 +934,9 @@
     <name>STM32F4xx_StdPeriph_Driver</name>
     <file>
       <name>$PROJ_DIR$\..\Libraries\STM32F4xx_StdPeriph_Driver\src\stm32f4xx_gpio.c</name>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\Libraries\STM32F4xx_StdPeriph_Driver\src\stm32f4xx_i2c.c</name>
     </file>
     <file>
       <name>$PROJ_DIR$\..\Libraries\STM32F4xx_StdPeriph_Driver\src\stm32f4xx_rcc.c</name>
@@ -949,6 +952,9 @@
     </file>
     <file>
       <name>$PROJ_DIR$\..\system_stm32f4xx.c</name>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\wheels.c</name>
     </file>
   </group>
 </project>

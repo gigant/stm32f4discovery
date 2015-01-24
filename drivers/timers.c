@@ -51,7 +51,7 @@ void TimersInit(void)
         TIM_ARRPreloadConfig(TIM11,ENABLE);
         TIM_Cmd(TIM11,ENABLE);   // запускаем счёт*/
         //////////////////////////////////////////////////////////////////////
-        RCC_APB2PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
+       /* RCC_APB2PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
         
         TIM_TimeBaseInitTypeDef base_timer3;
         TIM_TimeBaseStructInit(&base_timer3);
@@ -71,7 +71,7 @@ void TimersInit(void)
         TIM_OC1PreloadConfig(TIM4, TIM_OCPreload_Enable);
         
         TIM_ARRPreloadConfig(TIM4,ENABLE);
-        TIM_Cmd(TIM4,ENABLE);   // запускаем счёт
+        TIM_Cmd(TIM4,ENABLE);  */ // запускаем счёт
         
   return; 
 }

@@ -1,5 +1,7 @@
  #include "stm32f4xx.h"
- #include "Addons\wheels.h"
+ #include "wheels.h"
+ #include "drivers/mpu6050.h"
+ #include "drivers/hal_mpu6050.h"
 
 #define RedLed GPIO_Pin_14
 #define GreenLed GPIO_Pin_12
@@ -10,6 +12,16 @@ int main(void)
   int i=0;
   init_err = wheels_init();
   
+  MPU6050_I2C_Init();
+  MPU6050_Initialize();
+  
+  if( MPU6050_TestConnection() == TRUE)
+     {
+          i=1;   // connection success
+     }else
+          {
+             // connection failed
+          }
   
   if (!init_err) GPIO_SetBits (GPIOD, GreenLed);
                  else GPIO_SetBits (GPIOD, RedLed);

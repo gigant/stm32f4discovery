@@ -24,9 +24,10 @@ int gpio_init (void)
   /* структура для инициализации порта */
   GPIO_InitTypeDef  GPIO_InitStructure;
  
-  /* включаем тактирующие импульсы на портах A,B,D,E */
+  /* включаем тактирующие импульсы на портах A,B,C, D,E */
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);  
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
+  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
   

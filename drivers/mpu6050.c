@@ -1,655 +1,477 @@
-/**
-******************************************************************************
-* @addtogroup PIOS PIOS Core hardware abstraction layer
+//MPU6050 I2C library for ARM STM32F103xx Microcontrollers - Main source file
+//Has bit, byte and buffer I2C R/W functions
+// 23/05/2012 by Harinadha Reddy Chintalapalli <harinath.ec@gmail.com>
+// Changelog:
+//     2012-05-23 - initial release. Thanks to Jeff Rowberg <jeff@rowberg.net> for his AVR/Arduino
+//                  based MPU6050 development which inspired me & taken as reference to develop this.
+/* ============================================================================================
+MPU6050 device I2C library code for ARM STM32F103xx is placed under the MIT license
+Copyright (c) 2012 Harinadha Reddy Chintalapalli
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+================================================================================================
+*/
+
+/* Includes */
+#include "MPU6050.h"
+#include "stm32f4xx_i2c.h"
+#include "stm32f4xx_gpio.h"
+#include "stm32f4xx_rcc.h"
+
+/** @defgroup MPU6050_Library
 * @{
-* @addtogroup PIOS_MPU6050 MPU6050 Functions
-* @brief Deals with the hardware interface to the 3-axis gyro
-* @{
+*/
+
+/** Power on and prepare for general usage.
+* This will activate the device and take it out of sleep mode (which must be done
+* after start-up). This function also sets both the accelerometer and the gyroscope
+* to their most sensitive settings, namely +/- 2g and +/- 250 degrees/sec, and sets
+* the clock source to use the X Gyro for reference, which is slightly better than
+* the default internal clock source.
+*/
+void MPU6050_Initialize()
+{
+    MPU6050_SetClockSource(MPU6050_CLOCK_PLL_XGYRO);
+    MPU6050_SetFullScaleGyroRange(MPU6050_GYRO_FS_250);
+    MPU6050_SetFullScaleAccelRange(MPU6050_ACCEL_FS_2);
+    MPU6050_SetSleepModeStatus(DISABLE);
+}
+
+/** Verify the I2C connection.
+* Make sure the device is connected and responds as expected.
+* @return True if connection is valid, FALSE otherwise
+*/
+bool MPU6050_TestConnection()
+{
+    if(MPU6050_GetDeviceID() == 0x34) //0b110100; 8-bit representation in hex = 0x34
+      return TRUE;
+    else
+      return FAlSE;
+}
+// WHO_AM_I register
+
+/** Get Device ID.
+* This register is used to verify the identity of the device (0b110100).
+* @return Device ID (should be 0x68, 104 dec, 150 oct)
+* @see MPU6050_RA_WHO_AM_I
+* @see MPU6050_WHO_AM_I_BIT
+* @see MPU6050_WHO_AM_I_LENGTH
+*/
+uint8_t MPU6050_GetDeviceID()
+{
+    uint8_t tmp;
+    MPU6050_ReadBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_WHO_AM_I, MPU6050_WHO_AM_I_BIT, MPU6050_WHO_AM_I_LENGTH, &tmp);
+    return tmp;
+}
+/** Set clock source setting.
+* An internal 8MHz oscillator, gyroscope based clock, or external sources can
+* be selected as the MPU-60X0 clock source. When the internal 8 MHz oscillator
+* or an external source is chosen as the clock source, the MPU-60X0 can operate
+* in low power modes with the gyroscopes disabled.
 *
-* @file pios_mpu6050.c
-* @author The OpenPilot Team, http://www.openpilot.org Copyright (C) 2012.
-* @author Tau Labs, http://taulabs.org, Copyright (C) 2013-2014
-* @brief MPU6050 6-axis gyro and accel chip
-* @see The GNU Public License (GPL) Version 3
+* Upon power up, the MPU-60X0 clock source defaults to the internal oscillator.
+* However, it is highly recommended that the device be configured to use one of
+* the gyroscopes (or an external clock source) as the clock reference for
+* improved stability. The clock source can be selected according to the following table:
 *
-******************************************************************************
-*/
-/*
-* This program is free software; you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation; either version 3 of the License, or
-* (at your option) any later version.
+* <pre>
+* CLK_SEL | Clock Source
+* --------+--------------------------------------
+* 0       | Internal oscillator
+* 1       | PLL with X Gyro reference
+* 2       | PLL with Y Gyro reference
+* 3       | PLL with Z Gyro reference
+* 4       | PLL with external 32.768kHz reference
+* 5       | PLL with external 19.2MHz reference
+* 6       | Reserved
+* 7       | Stops the clock and keeps the timing generator in reset
+* </pre>
 *
-* This program is distributed in the hope that it will be useful, but
-* WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-* or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
-* for more details.
+* @param source New clock source setting
+* @see MPU6050_GetClockSource()
+* @see MPU6050_RA_PWR_MGMT_1
+* @see MPU6050_PWR1_CLKSEL_BIT
+* @see MPU6050_PWR1_CLKSEL_LENGTH
+*/
+void MPU6050_SetClockSource(uint8_t source)
+{
+    MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_PWR_MGMT_1, MPU6050_PWR1_CLKSEL_BIT, MPU6050_PWR1_CLKSEL_LENGTH, source);
+}
+
+/** Set full-scale gyroscope range.
+* @param range New full-scale gyroscope range value
+* @see MPU6050_GetFullScaleGyroRange()
+* @see MPU6050_GYRO_FS_250
+* @see MPU6050_RA_GYRO_CONFIG
+* @see MPU6050_GCONFIG_FS_SEL_BIT
+* @see MPU6050_GCONFIG_FS_SEL_LENGTH
+*/
+void MPU6050_SetFullScaleGyroRange(uint8_t range)
+{
+    MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_GYRO_CONFIG, MPU6050_GCONFIG_FS_SEL_BIT, MPU6050_GCONFIG_FS_SEL_LENGTH, range);
+}
+
+// GYRO_CONFIG register
+
+/** Get full-scale gyroscope range.
+* The FS_SEL parameter allows setting the full-scale range of the gyro sensors,
+* as described in the table below.
 *
-* You should have received a copy of the GNU General Public License along
-* with this program; if not, write to the Free Software Foundation, Inc.,
-* 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-*/
-/* Project Includes */
-#include "pios.h"
-#include "physical_constants.h"
-#if defined(PIOS_INCLUDE_MPU6050)
-#include "pios_semaphore.h"
-#include "pios_thread.h"
-#include "pios_queue.h"
-/* Private constants */
-#define MPU6050_TASK_PRIORITY	PIOS_THREAD_PRIO_HIGHEST
-#define MPU6050_TASK_STACK_BYTES	484
-/* Global Variables */
-enum pios_mpu6050_dev_magic {
-PIOS_MPU6050_DEV_MAGIC = 0xf21d26a2,
-};
-#define PIOS_MPU6050_MAX_QUEUESIZE 2
-struct mpu6050_dev {
-uint32_t i2c_id;
-uint8_t i2c_addr;
-enum pios_mpu60x0_range gyro_range;
-struct pios_queue *gyro_queue;
-#if defined(PIOS_MPU6050_ACCEL)
-enum pios_mpu60x0_accel_range accel_range;
-struct pios_queue *accel_queue;
-#endif /* PIOS_MPU6050_ACCEL */
-struct pios_thread *TaskHandle;
-struct pios_semaphore *data_ready_sema;
-const struct pios_mpu60x0_cfg *cfg;
-enum pios_mpu6050_dev_magic magic;
-enum pios_mpu60x0_filter filter;
-};
-//! Global structure for this device device
-static struct mpu6050_dev *pios_mpu6050_dev;
-//! Private functions
-static struct mpu6050_dev *PIOS_MPU6050_alloc(void);
-static int32_t PIOS_MPU6050_Validate(struct mpu6050_dev *dev);
-static void PIOS_MPU6050_Config(const struct pios_mpu60x0_cfg *cfg);
-static int32_t PIOS_MPU6050_SetReg(uint8_t address, uint8_t buffer);
-static int32_t PIOS_MPU6050_GetReg(uint8_t address);
-static int32_t PIOS_MPU6050_ReadID();
-static void PIOS_MPU6050_Task(void *parameters);
-/**
-* @brief Allocate a new device
-*/
-static struct mpu6050_dev *PIOS_MPU6050_alloc(void)
-{
-struct mpu6050_dev *mpu6050_dev;
-mpu6050_dev = (struct mpu6050_dev *)PIOS_malloc(sizeof(*mpu6050_dev));
-if (!mpu6050_dev) return (NULL);
-mpu6050_dev->magic = PIOS_MPU6050_DEV_MAGIC;
-#if defined(PIOS_MPU6050_ACCEL)
-mpu6050_dev->accel_queue = PIOS_Queue_Create(PIOS_MPU6050_MAX_QUEUESIZE, sizeof(struct pios_sensor_accel_data));
-if (mpu6050_dev->accel_queue == NULL) {
-PIOS_free(mpu6050_dev);
-return NULL;
-}
-#endif /* PIOS_MPU6050_ACCEL */
-mpu6050_dev->gyro_queue = PIOS_Queue_Create(PIOS_MPU6050_MAX_QUEUESIZE, sizeof(struct pios_sensor_gyro_data));
-if (mpu6050_dev->gyro_queue == NULL) {
-PIOS_free(mpu6050_dev);
-return NULL;
-}
-mpu6050_dev->data_ready_sema = PIOS_Semaphore_Create();
-if (mpu6050_dev->data_ready_sema == NULL) {
-PIOS_free(mpu6050_dev);
-return NULL;
-}
-return mpu6050_dev;
-}
-/**
-* @brief Validate the handle to the i2c device
-* @returns 0 for valid device or -1 otherwise
-*/
-static int32_t PIOS_MPU6050_Validate(struct mpu6050_dev *dev)
-{
-if (dev == NULL)
-return -1;
-if (dev->magic != PIOS_MPU6050_DEV_MAGIC)
-return -2;
-if (dev->i2c_id == 0)
-return -3;
-return 0;
-}
-/**
-* @brief Initialize the MPU6050 3-axis gyro sensor.
-* @return 0 for success, -1 for failure
-*/
-int32_t PIOS_MPU6050_Init(uint32_t i2c_id, uint8_t i2c_addr, const struct pios_mpu60x0_cfg *cfg)
-{
-pios_mpu6050_dev = PIOS_MPU6050_alloc();
-if (pios_mpu6050_dev == NULL)
-return -1;
-pios_mpu6050_dev->i2c_id = i2c_id;
-pios_mpu6050_dev->i2c_addr = i2c_addr;
-pios_mpu6050_dev->cfg = cfg;
-/* Configure the MPU6050 Sensor */
-PIOS_MPU6050_Config(cfg);
-pios_mpu6050_dev->TaskHandle = PIOS_Thread_Create(
-PIOS_MPU6050_Task, "pios_mpu6050", MPU6050_TASK_STACK_BYTES, NULL, MPU6050_TASK_PRIORITY);
-PIOS_Assert(pios_mpu6050_dev->TaskHandle != NULL);
-/* Set up EXTI line */
-PIOS_EXTI_Init(cfg->exti_cfg);
-#if defined(PIOS_MPU6050_ACCEL)
-PIOS_SENSORS_Register(PIOS_SENSOR_ACCEL, pios_mpu6050_dev->accel_queue);
-#endif /* PIOS_MPU6050_ACCEL */
-PIOS_SENSORS_Register(PIOS_SENSOR_GYRO, pios_mpu6050_dev->gyro_queue);
-return 0;
-}
-/**
-* @brief Initialize the MPU6050 3-axis gyro sensor
-* \return none
-* \param[in] PIOS_MPU6050_ConfigTypeDef struct to be used to configure sensor.
+* <pre>
+* 0 = +/- 250 degrees/sec
+* 1 = +/- 500 degrees/sec
+* 2 = +/- 1000 degrees/sec
+* 3 = +/- 2000 degrees/sec
+* </pre>
 *
+* @return Current full-scale gyroscope range setting
+* @see MPU6050_GYRO_FS_250
+* @see MPU6050_RA_GYRO_CONFIG
+* @see MPU6050_GCONFIG_FS_SEL_BIT
+* @see MPU6050_GCONFIG_FS_SEL_LENGTH
 */
-static void PIOS_MPU6050_Config(struct pios_mpu60x0_cfg const *cfg)
+uint8_t MPU6050_GetFullScaleGyroRange()
 {
-#if defined(PIOS_MPU6050_SIMPLE_INIT_SEQUENCE)
-// Reset chip
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_PWR_MGMT_REG, PIOS_MPU60X0_PWRMGMT_IMU_RST);
-// Reset sensors signal path
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_USER_CTRL_REG, PIOS_MPU60X0_USERCTL_GYRO_RST);
-// Give chip some time to initialize
-PIOS_DELAY_WaitmS(10);
-//Power management configuration
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_PWR_MGMT_REG, cfg->Pwr_mgmt_clk);
-// User control
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_USER_CTRL_REG, cfg->User_ctl);
-// Digital low-pass filter and scale
-// set this before sample rate else sample rate calculation will fail
-PIOS_MPU6050_SetLPF(cfg->default_filter);
-// Sample rate
-PIOS_MPU6050_SetSampleRate(cfg->default_samplerate);
-// Set the gyro scale
-PIOS_MPU6050_SetGyroRange(PIOS_MPU60X0_SCALE_500_DEG);
-#if defined(PIOS_MPU6050_ACCEL)
-// Set the accel scale
-PIOS_MPU6050_SetAccelRange(PIOS_MPU60X0_ACCEL_8G);
-#endif /* PIOS_MPU6050_ACCEL */
-// Interrupt configuration
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_INT_CFG_REG, cfg->interrupt_cfg);
-// Interrupt enable
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_INT_EN_REG, cfg->interrupt_en);
-#else /* PIOS_MPU6050_SIMPLE_INIT_SEQUENCE */
-/* This init sequence should really be dropped in favor of something
-* less redundant but it seems to be hard to get it running well
-* on all different targets.
-*/
-// Reset chip
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_PWR_MGMT_REG, 0x80 | cfg->Pwr_mgmt_clk);
-do {
-PIOS_DELAY_WaitmS(5);
-} while (PIOS_MPU6050_GetReg(PIOS_MPU60X0_PWR_MGMT_REG) & 0x80);
-PIOS_DELAY_WaitmS(25);
-// Reset chip and fifo
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_USER_CTRL_REG, 0x80 | 0x01 | 0x02 | 0x04);
-do {
-PIOS_DELAY_WaitmS(5);
-} while (PIOS_MPU6050_GetReg(PIOS_MPU60X0_USER_CTRL_REG) & 0x07);
-PIOS_DELAY_WaitmS(25);
-//Power management configuration
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_PWR_MGMT_REG, cfg->Pwr_mgmt_clk);
-// Interrupt configuration
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_INT_CFG_REG, cfg->interrupt_cfg);
-// Interrupt enable
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_INT_EN_REG, cfg->interrupt_en);
-#if defined(PIOS_MPU6050_ACCEL)
-// Set the accel scale
-PIOS_MPU6050_SetAccelRange(PIOS_MPU60X0_ACCEL_8G);
-#endif
-// Digital low-pass filter and scale
-// set this before sample rate else sample rate calculation will fail
-PIOS_MPU6050_SetLPF(cfg->default_filter);
-// Sample rate
-PIOS_MPU6050_SetSampleRate(cfg->default_samplerate);
-// Set the gyro scale
-PIOS_MPU6050_SetGyroRange(PIOS_MPU60X0_SCALE_500_DEG);
-// User control
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_USER_CTRL_REG, cfg->User_ctl);
-//Power management configuration
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_PWR_MGMT_REG, cfg->Pwr_mgmt_clk);
-// Interrupt configuration
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_INT_CFG_REG, cfg->interrupt_cfg);
-// Interrupt enable
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_INT_EN_REG, cfg->interrupt_en);
-#endif /* PIOS_MPU6050_SIMPLE_INIT_SEQUENCE */
+    uint8_t tmp;
+    MPU6050_ReadBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_GYRO_CONFIG, MPU6050_GCONFIG_FS_SEL_BIT, MPU6050_GCONFIG_FS_SEL_LENGTH, &tmp);
+    return tmp;
 }
+/** Get full-scale accelerometer range.
+* The FS_SEL parameter allows setting the full-scale range of the accelerometer
+* sensors, as described in the table below.
+*
+* <pre>
+* 0 = +/- 2g
+* 1 = +/- 4g
+* 2 = +/- 8g
+* 3 = +/- 16g
+* </pre>
+*
+* @return Current full-scale accelerometer range setting
+* @see MPU6050_ACCEL_FS_2
+* @see MPU6050_RA_ACCEL_CONFIG
+* @see MPU6050_ACONFIG_AFS_SEL_BIT
+* @see MPU6050_ACONFIG_AFS_SEL_LENGTH
+*/
+uint8_t MPU6050_GetFullScaleAccelRange()
+{
+    uint8_t tmp;
+    MPU6050_ReadBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_ACCEL_CONFIG, MPU6050_ACONFIG_AFS_SEL_BIT, MPU6050_ACONFIG_AFS_SEL_LENGTH, &tmp);
+    return tmp;
+}
+/** Set full-scale accelerometer range.
+* @param range New full-scale accelerometer range setting
+* @see MPU6050_GetFullScaleAccelRange()
+*/
+void MPU6050_SetFullScaleAccelRange(uint8_t range)
+{
+    MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_ACCEL_CONFIG, MPU6050_ACONFIG_AFS_SEL_BIT, MPU6050_ACONFIG_AFS_SEL_LENGTH, range);
+}
+
+/** Get sleep mode status.
+* Setting the SLEEP bit in the register puts the device into very low power
+* sleep mode. In this mode, only the serial interface and internal registers
+* remain active, allowing for a very low standby current. Clearing this bit
+* puts the device back into normal mode. To save power, the individual standby
+* selections for each of the gyros should be used if any gyro axis is not used
+* by the application.
+* @return Current sleep mode enabled status
+* @see MPU6050_RA_PWR_MGMT_1
+* @see MPU6050_PWR1_SLEEP_BIT
+*/
+bool MPU6050_GetSleepModeStatus()
+{
+    uint8_t tmp;
+    MPU6050_ReadBit(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_PWR_MGMT_1, MPU6050_PWR1_SLEEP_BIT, &tmp);
+    if(tmp == 0x00)
+      return FAlSE;
+    else
+      return TRUE;   
+}
+/** Set sleep mode status.
+* @param enabled New sleep mode enabled status
+* @see MPU6050_GetSleepModeStatus()
+* @see MPU6050_RA_PWR_MGMT_1
+* @see MPU6050_PWR1_SLEEP_BIT
+*/
+void MPU6050_SetSleepModeStatus(FunctionalState NewState)
+{
+    MPU6050_WriteBit(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_PWR_MGMT_1, MPU6050_PWR1_SLEEP_BIT, NewState);
+}
+
+/** Get raw 6-axis motion sensor readings (accel/gyro).
+* Retrieves all currently available motion sensor values.
+* @param AccelGyro 16-bit signed integer array of length 6
+* @see MPU6050_RA_ACCEL_XOUT_H
+*/
+void MPU6050_GetRawAccelGyro(s16* AccelGyro)
+{
+
+   int i;
+    u8 tmpBuffer[14];
+    MPU6050_I2C_BufferRead(MPU6050_DEFAULT_ADDRESS, tmpBuffer, MPU6050_RA_ACCEL_XOUT_H, 14);
+    /* Get acceleration */
+    for(i=0; i<3; i++)
+      AccelGyro[i]=((s16)((u16)tmpBuffer[2*i] << 8) + tmpBuffer[2*i+1]);
+   /* Get Angular rate */
+    for(i=4; i<7; i++)
+      AccelGyro[i-1]=((s16)((u16)tmpBuffer[2*i] << 8) + tmpBuffer[2*i+1]);
+
+}
+
+/** Write multiple bits in an 8-bit device register.
+* @param slaveAddr I2C slave device address
+* @param regAddr Register regAddr to write to
+* @param bitStart First bit position to write (0-7)
+* @param length Number of bits to write (not more than 8)
+* @param data Right-aligned value to write
+*/
+void MPU6050_WriteBits(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data)
+{
+    //      010 value to write
+    // 76543210 bit numbers
+    //    xxx   args: bitStart=4, length=3
+    // 00011100 mask byte
+    // 10101111 original value (sample)
+    // 10100011 original & ~mask
+    // 10101011 masked | value
+    uint8_t tmp;
+    MPU6050_I2C_BufferRead(slaveAddr, &tmp, regAddr, 1);
+    uint8_t mask = ((1 << length) - 1) << (bitStart - length + 1);
+    data <<= (bitStart - length + 1); // shift data into correct position
+    data &= mask; // zero all non-important bits in data
+    tmp &= ~(mask); // zero all important bits in existing byte
+    tmp |= data; // combine data with existing byte
+    MPU6050_I2C_ByteWrite(slaveAddr,&tmp,regAddr);
+}
+/** write a single bit in an 8-bit device register.
+* @param slaveAddr I2C slave device address
+* @param regAddr Register regAddr to write to
+* @param bitNum Bit position to write (0-7)
+* @param value New bit value to write
+*/
+void MPU6050_WriteBit(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitNum, uint8_t data)
+{
+    uint8_t tmp;
+    MPU6050_I2C_BufferRead(slaveAddr, &tmp, regAddr, 1);
+    tmp = (data != 0) ? (tmp | (1 << bitNum)) : (tmp & ~(1 << bitNum));
+    MPU6050_I2C_ByteWrite(slaveAddr,&tmp,regAddr);
+}
+/** Read multiple bits from an 8-bit device register.
+* @param slaveAddr I2C slave device address
+* @param regAddr Register regAddr to read from
+* @param bitStart First bit position to read (0-7)
+* @param length Number of bits to read (not more than 8)
+* @param data Container for right-aligned value (i.e. '101' read from any bitStart position will equal 0x05)
+* @param timeout Optional read timeout in milliseconds (0 to disable, leave off to use default class value in readTimeout)
+*/
+void MPU6050_ReadBits(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t *data)
+{
+    // 01101001 read byte
+    // 76543210 bit numbers
+    //    xxx   args: bitStart=4, length=3
+    //    010   masked
+    //   -> 010 shifted
+    uint8_t tmp;
+    MPU6050_I2C_BufferRead(slaveAddr, &tmp, regAddr, 1);
+    uint8_t mask = ((1 << length) - 1) << (bitStart - length + 1);
+    tmp &= mask;
+    tmp >>= (bitStart - length + 1);
+    *data = tmp;
+}
+
+/** Read a single bit from an 8-bit device register.
+* @param slaveAddr I2C slave device address
+* @param regAddr Register regAddr to read from
+* @param bitNum Bit position to read (0-7)
+* @param data Container for single bit value
+* @param timeout Optional read timeout in milliseconds (0 to disable, leave off to use default class value in readTimeout)
+*/
+void MPU6050_ReadBit(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitNum, uint8_t *data)
+{
+    uint8_t tmp;
+    MPU6050_I2C_BufferRead(slaveAddr, &tmp, regAddr, 1);
+    *data = tmp & (1 << bitNum);
+}
+
 /**
-* Set the gyro range and store it locally for scaling
+* @brief  Initializes the I2C peripheral used to drive the MPU6050
+* @param  None
+* @return None
 */
-void PIOS_MPU6050_SetGyroRange(enum pios_mpu60x0_range gyro_range)
+void MPU6050_I2C_Init()
 {
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_GYRO_CFG_REG, gyro_range);
-switch(gyro_range) {
-case PIOS_MPU60X0_SCALE_250_DEG:
-PIOS_SENSORS_SetMaxGyro(250);
-break;
-case PIOS_MPU60X0_SCALE_500_DEG:
-PIOS_SENSORS_SetMaxGyro(500);
-break;
-case PIOS_MPU60X0_SCALE_1000_DEG:
-PIOS_SENSORS_SetMaxGyro(1000);
-break;
-case PIOS_MPU60X0_SCALE_2000_DEG:
-PIOS_SENSORS_SetMaxGyro(2000);
-break;
+  I2C_InitTypeDef  I2C_InitStructure;
+  GPIO_InitTypeDef GPIO_InitStructure;
+
+  /* Enable I2C and GPIO clocks */
+  RCC_APB1PeriphClockCmd(MPU6050_I2C_RCC_Periph, ENABLE);
+
+  /* Configure I2C pins: SCL and SDA */
+  GPIO_InitStructure.GPIO_Pin =  MPU6050_I2C_SCL_Pin;// | MPU6050_I2C_SCL_Pin;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+  GPIO_Init(MPU6050_I2C_Port_SCL, &GPIO_InitStructure);
+  
+  GPIO_InitStructure.GPIO_Pin =  MPU6050_I2C_SCL_Pin;// | MPU6050_I2C_SDA_Pin;
+  GPIO_Init(MPU6050_I2C_Port_SDA, &GPIO_InitStructure);
+  
+  GPIO_PinAFConfig (GPIOA, GPIO_PinSource8, GPIO_AF_I2C3); 
+  GPIO_PinAFConfig (GPIOC, GPIO_PinSource9, GPIO_AF_I2C3); 
+  
+  /* I2C configuration */
+  I2C_InitStructure.I2C_Mode = I2C_Mode_I2C;
+  I2C_InitStructure.I2C_DutyCycle = I2C_DutyCycle_2;
+  I2C_InitStructure.I2C_OwnAddress1 = MPU6050_DEFAULT_ADDRESS; // MPU6050 7-bit adress = 0x68, 8-bit adress = 0xD0;
+  I2C_InitStructure.I2C_Ack = I2C_Ack_Enable;
+  I2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
+  I2C_InitStructure.I2C_ClockSpeed = MPU6050_I2C_Speed;
+ 
+  /* Apply I2C configuration after enabling it */
+  I2C_Init(MPU6050_I2C, &I2C_InitStructure);
+  /* I2C Peripheral Enable */ 
+  I2C_Cmd(MPU6050_I2C, ENABLE);
+
 }
-pios_mpu6050_dev->gyro_range = gyro_range;
-}
+
 /**
-* Set the accel range and store it locally for scaling
+* @brief  Writes one byte to the  MPU6050.
+* @param  slaveAddr : slave address MPU6050_DEFAULT_ADDRESS
+* @param  pBuffer : pointer to the buffer  containing the data to be written to the MPU6050.
+* @param  writeAddr : address of the register in which the data will be written
+* @return None
 */
-#if defined(PIOS_MPU6050_ACCEL)
-void PIOS_MPU6050_SetAccelRange(enum pios_mpu60x0_accel_range accel_range)
+void MPU6050_I2C_ByteWrite(u8 slaveAddr, u8* pBuffer, u8 writeAddr)
 {
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_ACCEL_CFG_REG, accel_range);
-pios_mpu6050_dev->accel_range = accel_range;
+//  ENTR_CRT_SECTION();
+
+  /* Send START condition */
+  I2C_GenerateSTART(MPU6050_I2C, ENABLE);
+
+  /* Test on EV5 and clear it */
+  while(!I2C_CheckEvent(MPU6050_I2C, I2C_EVENT_MASTER_MODE_SELECT));
+
+  /* Send MPU6050 address for write */
+  I2C_Send7bitAddress(MPU6050_I2C, slaveAddr, I2C_Direction_Transmitter);
+
+  /* Test on EV6 and clear it */
+  while(!I2C_CheckEvent(MPU6050_I2C, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));
+
+  /* Send the MPU6050's internal address to write to */
+  I2C_SendData(MPU6050_I2C, writeAddr);
+
+  /* Test on EV8 and clear it */
+  while(!I2C_CheckEvent(MPU6050_I2C, I2C_EVENT_MASTER_BYTE_TRANSMITTED));
+
+  /* Send the byte to be written */
+  I2C_SendData(MPU6050_I2C, *pBuffer);
+
+  /* Test on EV8 and clear it */
+  while(!I2C_CheckEvent(MPU6050_I2C, I2C_EVENT_MASTER_BYTE_TRANSMITTED));
+
+  /* Send STOP condition */
+  I2C_GenerateSTOP(MPU6050_I2C, ENABLE);
+
+// EXT_CRT_SECTION();
+
 }
-#endif /* PIOS_MPU6050_ACCEL */
+
 /**
-* Set the sample rate in Hz by determining the nearest divisor
-* @param[in] sample rate in Hz
+* @brief  Reads a block of data from the MPU6050.
+* @param  slaveAddr  : slave address MPU6050_DEFAULT_ADDRESS
+* @param  pBuffer : pointer to the buffer that receives the data read from the MPU6050.
+* @param  readAddr : MPU6050's internal address to read from.
+* @param  NumByteToRead : number of bytes to read from the MPU6050 ( NumByteToRead >1  only for the Mgnetometer readinf).
+* @return None
 */
-void PIOS_MPU6050_SetSampleRate(uint16_t samplerate_hz)
+
+void MPU6050_I2C_BufferRead(u8 slaveAddr, u8* pBuffer, u8 readAddr, u16 NumByteToRead)
 {
-uint16_t filter_frequency = 8000;
-if (pios_mpu6050_dev->filter != PIOS_MPU60X0_LOWPASS_256_HZ)
-filter_frequency = 1000;
-// limit samplerate to filter frequency
-if (samplerate_hz > filter_frequency)
-samplerate_hz = filter_frequency;
-// calculate divisor, round to nearest integeter
-int32_t divisor = (int32_t)(((float)filter_frequency / samplerate_hz) + 0.5f) - 1;
-// limit resulting divisor to register value range
-if (divisor < 0)
-divisor = 0;
-if (divisor > 0xff)
-divisor = 0xff;
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_SMPLRT_DIV_REG, (uint8_t)divisor);
+// ENTR_CRT_SECTION();
+
+  /* While the bus is busy */
+  while(I2C_GetFlagStatus(MPU6050_I2C, I2C_FLAG_BUSY));
+
+  /* Send START condition */
+  I2C_GenerateSTART(MPU6050_I2C, ENABLE);
+
+  /* Test on EV5 and clear it */
+  while(!I2C_CheckEvent(MPU6050_I2C, I2C_EVENT_MASTER_MODE_SELECT));
+
+  /* Send MPU6050 address for write */
+  I2C_Send7bitAddress(MPU6050_I2C, slaveAddr, I2C_Direction_Transmitter);
+
+  /* Test on EV6 and clear it */
+  while(!I2C_CheckEvent(MPU6050_I2C, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));
+
+  /* Clear EV6 by setting again the PE bit */
+  I2C_Cmd(MPU6050_I2C, ENABLE);
+
+  /* Send the MPU6050's internal address to write to */
+  I2C_SendData(MPU6050_I2C, readAddr);
+
+  /* Test on EV8 and clear it */
+  while(!I2C_CheckEvent(MPU6050_I2C, I2C_EVENT_MASTER_BYTE_TRANSMITTED));
+
+  /* Send STRAT condition a second time */
+  I2C_GenerateSTART(MPU6050_I2C, ENABLE);
+
+  /* Test on EV5 and clear it */
+  while(!I2C_CheckEvent(MPU6050_I2C, I2C_EVENT_MASTER_MODE_SELECT));
+
+  /* Send MPU6050 address for read */
+  I2C_Send7bitAddress(MPU6050_I2C, slaveAddr, I2C_Direction_Receiver);
+
+  /* Test on EV6 and clear it */
+  while(!I2C_CheckEvent(MPU6050_I2C, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED));
+
+  /* While there is data to be read */
+  while(NumByteToRead)
+  {
+    if(NumByteToRead == 1)
+    {
+      /* Disable Acknowledgement */
+      I2C_AcknowledgeConfig(MPU6050_I2C, DISABLE);
+
+      /* Send STOP Condition */
+      I2C_GenerateSTOP(MPU6050_I2C, ENABLE);
+    }
+
+    /* Test on EV7 and clear it */
+    if(I2C_CheckEvent(MPU6050_I2C, I2C_EVENT_MASTER_BYTE_RECEIVED))
+    {
+      /* Read a byte from the MPU6050 */
+      *pBuffer = I2C_ReceiveData(MPU6050_I2C);
+
+      /* Point to the next location where the byte read will be saved */
+      pBuffer++;
+
+      /* Decrement the read bytes counter */
+      NumByteToRead--;
+    }
+  }
+
+  /* Enable Acknowledgement to be ready for another reception */
+  I2C_AcknowledgeConfig(MPU6050_I2C, ENABLE);
+//  EXT_CRT_SECTION();
+
 }
-/**
-* Set the MPU6050 to act as a pass-through
-*/
-void PIOS_MPU6050_SetPassThrough(bool passThrough)
-{
-int32_t int_cfg_reg = PIOS_MPU6050_GetReg(PIOS_MPU60X0_INT_CFG_REG);
-if(passThrough)
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_INT_CFG_REG, int_cfg_reg | (1 << 1)); // Set bit1 (I2C_BYPASS_EN)
-else
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_INT_CFG_REG, int_cfg_reg & ~(1 << 1)); // Clear bit1 (I2C_BYPASS_EN)
-int32_t user_ctrl_reg = PIOS_MPU6050_GetReg(PIOS_MPU60X0_USER_CTRL_REG); // USER_CTRL
-if(passThrough)
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_USER_CTRL_REG, user_ctrl_reg & ~(1 << 5)); // Clear bit1 (I2C_MST_EN)
-else
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_USER_CTRL_REG, user_ctrl_reg | (1 << 5)); // Set bit1 (I2C_MST_EN)
-}
-/**
-* Configure the digital low-pass filter
-*/
-void PIOS_MPU6050_SetLPF(enum pios_mpu60x0_filter filter)
-{
-PIOS_MPU6050_SetReg(PIOS_MPU60X0_DLPF_CFG_REG, filter);
-pios_mpu6050_dev->filter = filter;
-}
-/**
-* Check if an MPU6050 is detected at the requested address
-* @return 0 if detected, -1 if successfully probed but wrong id
-* -2 no device at address
-*/
-int32_t PIOS_MPU6050_Probe(uint32_t i2c_id, uint8_t i2c_addr)
-{
-uint8_t addr_buffer[] = {
-PIOS_MPU60X0_WHOAMI,
-};
-uint8_t read_buffer[1] = {
-0
-};
-const struct pios_i2c_txn txn_list[] = {
-{
-.info = __func__,
-.addr = i2c_addr,
-.rw = PIOS_I2C_TXN_WRITE,
-.len = sizeof(addr_buffer),
-.buf = addr_buffer,
-},
-{
-.info = __func__,
-.addr = i2c_addr,
-.rw = PIOS_I2C_TXN_READ,
-.len = sizeof(read_buffer),
-.buf = read_buffer,
-}
-};
-int32_t retval = PIOS_I2C_Transfer(i2c_id, txn_list, NELEMENTS(txn_list));
-if (retval < 0)
-return -2;
-if (read_buffer[0] == 0x68)
-return 0;
-return -1;
-}
-/**
-* @brief Reads one or more bytes into a buffer
-* \param[in] address MPU6050 register address (depends on size)
-* \param[out] buffer destination buffer
-* \param[in] len number of bytes which should be read
-* \return 0 if operation was successful
-* \return -1 if error during I2C transfer
-* \return -2 if unable to claim i2c device
-*/
-static int32_t PIOS_MPU6050_Read(uint8_t address, uint8_t *buffer, uint8_t len)
-{
-uint8_t addr_buffer[] = {
-address,
-};
-const struct pios_i2c_txn txn_list[] = {
-{
-.info = __func__,
-.addr = pios_mpu6050_dev->i2c_addr,
-.rw = PIOS_I2C_TXN_WRITE,
-.len = sizeof(addr_buffer),
-.buf = addr_buffer,
-},
-{
-.info = __func__,
-.addr = pios_mpu6050_dev->i2c_addr,
-.rw = PIOS_I2C_TXN_READ,
-.len = len,
-.buf = buffer,
-}
-};
-return PIOS_I2C_Transfer(pios_mpu6050_dev->i2c_id, txn_list, NELEMENTS(txn_list));
-}
-/**
-* @brief Writes one or more bytes to the MPU6050
-* \param[in] address Register address
-* \param[in] buffer source buffer
-* \return 0 if operation was successful
-* \return -1 if error during I2C transfer
-* \return -2 if unable to claim i2c device
-*/
-static int32_t PIOS_MPU6050_Write(uint8_t address, uint8_t buffer)
-{
-uint8_t data[] = {
-address,
-buffer,
-};
-const struct pios_i2c_txn txn_list[] = {
-{
-.info = __func__,
-.addr = pios_mpu6050_dev->i2c_addr,
-.rw = PIOS_I2C_TXN_WRITE,
-.len = sizeof(data),
-.buf = data,
-},
-};
-return PIOS_I2C_Transfer(pios_mpu6050_dev->i2c_id, txn_list, NELEMENTS(txn_list));
-}
-/**
-* @brief Read a register from MPU6050
-* @returns The register value or -1 if failure to get bus
-* @param reg[in] Register address to be read
-*/
-static int32_t PIOS_MPU6050_GetReg(uint8_t reg)
-{
-uint8_t data;
-int32_t retval = PIOS_MPU6050_Read(reg, &data, sizeof(data));
-if (retval != 0)
-return retval;
-else
-return data;
-}
-/**
-* @brief Writes one byte to the MPU6050
-* \param[in] reg Register address
-* \param[in] data Byte to write
-* \return 0 if operation was successful
-* \return -1 if unable to claim SPI bus
-* \return -2 if unable to claim i2c device
-*/
-static int32_t PIOS_MPU6050_SetReg(uint8_t reg, uint8_t data)
-{
-return PIOS_MPU6050_Write(reg, data);
-}
-/*
-* @brief Read the identification bytes from the MPU6050 sensor
-* \return ID read from MPU6050 or -1 if failure
-*/
-static int32_t PIOS_MPU6050_ReadID()
-{
-int32_t mpu6050_id = PIOS_MPU6050_GetReg(PIOS_MPU60X0_WHOAMI);
-if (mpu6050_id < 0)
-return -1;
-return mpu6050_id;
-}
-static float PIOS_MPU6050_GetGyroScale()
-{
-switch (pios_mpu6050_dev->gyro_range) {
-case PIOS_MPU60X0_SCALE_250_DEG:
-return 1.0f / 131.0f;
-case PIOS_MPU60X0_SCALE_500_DEG:
-return 1.0f / 65.5f;
-case PIOS_MPU60X0_SCALE_1000_DEG:
-return 1.0f / 32.8f;
-case PIOS_MPU60X0_SCALE_2000_DEG:
-return 1.0f / 16.4f;
-}
-return 0;
-}
-#if defined(PIOS_MPU6050_ACCEL)
-static float PIOS_MPU6050_GetAccelScale()
-{
-switch (pios_mpu6050_dev->accel_range) {
-case PIOS_MPU60X0_ACCEL_2G:
-return GRAVITY / 16384.0f;
-case PIOS_MPU60X0_ACCEL_4G:
-return GRAVITY / 8192.0f;
-case PIOS_MPU60X0_ACCEL_8G:
-return GRAVITY / 4096.0f;
-case PIOS_MPU60X0_ACCEL_16G:
-return GRAVITY / 2048.0f;
-}
-return 0;
-}
-#endif /* PIOS_MPU6050_ACCEL */
-/**
-* @brief Run self-test operation.
-* \return 0 if test succeeded
-* \return non-zero value if test succeeded
-*/
-uint8_t PIOS_MPU6050_Test(void)
-{
-/* Verify that ID matches (MPU6050 ID is 0x68) */
-int32_t mpu6050_id = PIOS_MPU6050_ReadID();
-if (mpu6050_id < 0)
-return -1;
-if (mpu6050_id != 0x68)
-return -2;
-return 0;
-}
-/**
-* @brief IRQ Handler. Read all the data from onboard buffer
-*/
-bool PIOS_MPU6050_IRQHandler(void)
-{
-if (PIOS_MPU6050_Validate(pios_mpu6050_dev) != 0)
-return false;
-bool woken = false;
-PIOS_Semaphore_Give_FromISR(pios_mpu6050_dev->data_ready_sema, &woken);
-return woken;
-}
-static void PIOS_MPU6050_Task(void *parameters)
-{
-while (1) {
-//Wait for data ready interrupt
-if (PIOS_Semaphore_Take(pios_mpu6050_dev->data_ready_sema, PIOS_SEMAPHORE_TIMEOUT_MAX) != true)
-continue;
-enum {
-IDX_ACCEL_XOUT_H = 0,
-IDX_ACCEL_XOUT_L,
-IDX_ACCEL_YOUT_H,
-IDX_ACCEL_YOUT_L,
-IDX_ACCEL_ZOUT_H,
-IDX_ACCEL_ZOUT_L,
-IDX_TEMP_OUT_H,
-IDX_TEMP_OUT_L,
-IDX_GYRO_XOUT_H,
-IDX_GYRO_XOUT_L,
-IDX_GYRO_YOUT_H,
-IDX_GYRO_YOUT_L,
-IDX_GYRO_ZOUT_H,
-IDX_GYRO_ZOUT_L,
-BUFFER_SIZE,
-};
-uint8_t mpu6050_rec_buf[BUFFER_SIZE];
-if (PIOS_MPU6050_Read(PIOS_MPU60X0_ACCEL_X_OUT_MSB, mpu6050_rec_buf, sizeof(mpu6050_rec_buf)) < 0) {
-continue;
-}
-// Rotate the sensor to OP convention. The datasheet defines X as towards the right
-// and Y as forward. OP convention transposes this. Also the Z is defined negatively
-// to our convention
-#if defined(PIOS_MPU6050_ACCEL)
-// Currently we only support rotations on top so switch X/Y accordingly
-struct pios_sensor_accel_data accel_data;
-struct pios_sensor_gyro_data gyro_data;
-switch (pios_mpu6050_dev->cfg->orientation) {
-case PIOS_MPU60X0_TOP_0DEG:
-accel_data.y = (int16_t)(mpu6050_rec_buf[IDX_ACCEL_XOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_XOUT_L]);
-accel_data.x = (int16_t)(mpu6050_rec_buf[IDX_ACCEL_YOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_YOUT_L]);
-gyro_data.y = (int16_t)(mpu6050_rec_buf[IDX_GYRO_XOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_XOUT_L]);
-gyro_data.x = (int16_t)(mpu6050_rec_buf[IDX_GYRO_YOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_YOUT_L]);
-gyro_data.z = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_ZOUT_L]);
-accel_data.z = - (int16_t)(mpu6050_rec_buf[IDX_ACCEL_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_ZOUT_L]);
-break;
-case PIOS_MPU60X0_TOP_90DEG:
-accel_data.y = - (int16_t)(mpu6050_rec_buf[IDX_ACCEL_YOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_YOUT_L]);
-accel_data.x = (int16_t)(mpu6050_rec_buf[IDX_ACCEL_XOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_XOUT_L]);
-gyro_data.y = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_YOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_YOUT_L]);
-gyro_data.x = (int16_t)(mpu6050_rec_buf[IDX_GYRO_XOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_XOUT_L]);
-gyro_data.z = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_ZOUT_L]);
-accel_data.z = - (int16_t)(mpu6050_rec_buf[IDX_ACCEL_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_ZOUT_L]);
-break;
-case PIOS_MPU60X0_TOP_180DEG:
-accel_data.y = - (int16_t)(mpu6050_rec_buf[IDX_ACCEL_XOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_XOUT_L]);
-accel_data.x = - (int16_t)(mpu6050_rec_buf[IDX_ACCEL_YOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_YOUT_L]);
-gyro_data.y = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_XOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_XOUT_L]);
-gyro_data.x = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_YOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_YOUT_L]);
-gyro_data.z = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_ZOUT_L]);
-accel_data.z = - (int16_t)(mpu6050_rec_buf[IDX_ACCEL_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_ZOUT_L]);
-break;
-case PIOS_MPU60X0_TOP_270DEG:
-accel_data.y = (int16_t)(mpu6050_rec_buf[IDX_ACCEL_YOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_YOUT_L]);
-accel_data.x = - (int16_t)(mpu6050_rec_buf[IDX_ACCEL_XOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_XOUT_L]);
-gyro_data.y = (int16_t)(mpu6050_rec_buf[IDX_GYRO_YOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_YOUT_L]);
-gyro_data.x = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_XOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_XOUT_L]);
-gyro_data.z = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_ZOUT_L]);
-accel_data.z = - (int16_t)(mpu6050_rec_buf[IDX_ACCEL_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_ZOUT_L]);
-break;
-case PIOS_MPU60X0_BOTTOM_0DEG:
-accel_data.y = - (int16_t)(mpu6050_rec_buf[IDX_ACCEL_XOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_XOUT_L]);
-accel_data.x = (int16_t)(mpu6050_rec_buf[IDX_ACCEL_YOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_YOUT_L]);
-gyro_data.y = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_XOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_XOUT_L]);
-gyro_data.x = (int16_t)(mpu6050_rec_buf[IDX_GYRO_YOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_YOUT_L]);
-gyro_data.z = (int16_t)(mpu6050_rec_buf[IDX_GYRO_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_ZOUT_L]);
-accel_data.z = (int16_t)(mpu6050_rec_buf[IDX_ACCEL_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_ZOUT_L]);
-break;
-case PIOS_MPU60X0_BOTTOM_90DEG:
-accel_data.y = (int16_t)(mpu6050_rec_buf[IDX_ACCEL_YOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_YOUT_L]);
-accel_data.x = (int16_t)(mpu6050_rec_buf[IDX_ACCEL_XOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_XOUT_L]);
-gyro_data.y = (int16_t)(mpu6050_rec_buf[IDX_GYRO_YOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_YOUT_L]);
-gyro_data.x = (int16_t)(mpu6050_rec_buf[IDX_GYRO_XOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_XOUT_L]);
-gyro_data.z = (int16_t)(mpu6050_rec_buf[IDX_GYRO_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_ZOUT_L]);
-accel_data.z = (int16_t)(mpu6050_rec_buf[IDX_ACCEL_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_ZOUT_L]);
-break;
-case PIOS_MPU60X0_BOTTOM_180DEG:
-accel_data.y = (int16_t)(mpu6050_rec_buf[IDX_ACCEL_XOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_XOUT_L]);
-accel_data.x = - (int16_t)(mpu6050_rec_buf[IDX_ACCEL_YOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_YOUT_L]);
-gyro_data.y = (int16_t)(mpu6050_rec_buf[IDX_GYRO_XOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_XOUT_L]);
-gyro_data.x = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_YOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_YOUT_L]);
-gyro_data.z = (int16_t)(mpu6050_rec_buf[IDX_GYRO_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_ZOUT_L]);
-accel_data.z = (int16_t)(mpu6050_rec_buf[IDX_ACCEL_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_ZOUT_L]);
-break;
-case PIOS_MPU60X0_BOTTOM_270DEG:
-accel_data.y = - (int16_t)(mpu6050_rec_buf[IDX_ACCEL_YOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_YOUT_L]);
-accel_data.x = - (int16_t)(mpu6050_rec_buf[IDX_ACCEL_XOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_XOUT_L]);
-gyro_data.y = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_YOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_YOUT_L]);
-gyro_data.x = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_XOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_XOUT_L]);
-gyro_data.z = (int16_t)(mpu6050_rec_buf[IDX_GYRO_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_ZOUT_L]);
-accel_data.z = (int16_t)(mpu6050_rec_buf[IDX_ACCEL_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_ACCEL_ZOUT_L]);
-break;
-}
-int16_t raw_temp = (int16_t)(mpu6050_rec_buf[IDX_TEMP_OUT_H] << 8 | mpu6050_rec_buf[IDX_TEMP_OUT_L]);
-float temperature = 35.0f + ((float)raw_temp + 512.0f) / 340.0f;
-// Apply sensor scaling
-float accel_scale = PIOS_MPU6050_GetAccelScale();
-accel_data.x *= accel_scale;
-accel_data.y *= accel_scale;
-accel_data.z *= accel_scale;
-accel_data.temperature = temperature;
-float gyro_scale = PIOS_MPU6050_GetGyroScale();
-gyro_data.x *= gyro_scale;
-gyro_data.y *= gyro_scale;
-gyro_data.z *= gyro_scale;
-gyro_data.temperature = temperature;
-PIOS_Queue_Send(pios_mpu6050_dev->accel_queue, &accel_data, 0);
-PIOS_Queue_Send(pios_mpu6050_dev->gyro_queue, &gyro_data, 0);
-#else
-struct pios_sensor_gyro_data gyro_data;
-switch (pios_mpu6050_dev->cfg->orientation) {
-case PIOS_MPU60X0_TOP_0DEG:
-gyro_data.y = (int16_t)(mpu6050_rec_buf[IDX_GYRO_XOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_XOUT_L]);
-gyro_data.x = (int16_t)(mpu6050_rec_buf[IDX_GYRO_YOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_YOUT_L]);
-gyro_data.z = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_ZOUT_L]);
-break;
-case PIOS_MPU60X0_TOP_90DEG:
-gyro_data.y = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_YOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_YOUT_L]);
-gyro_data.x = (int16_t)(mpu6050_rec_buf[IDX_GYRO_XOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_XOUT_L]);
-gyro_data.z = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_ZOUT_L]);
-break;
-case PIOS_MPU60X0_TOP_180DEG:
-gyro_data.y = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_XOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_XOUT_L]);
-gyro_data.x = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_YOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_YOUT_L]);
-gyro_data.z = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_ZOUT_L]);
-break;
-case PIOS_MPU60X0_TOP_270DEG:
-gyro_data.y = (int16_t)(mpu6050_rec_buf[IDX_GYRO_YOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_YOUT_L]);
-gyro_data.x = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_XOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_XOUT_L]);
-gyro_data.z = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_ZOUT_L]);
-break;
-case PIOS_MPU60X0_BOTTOM_0DEG:
-gyro_data.y = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_XOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_XOUT_L]);
-gyro_data.x = (int16_t)(mpu6050_rec_buf[IDX_GYRO_YOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_YOUT_L]);
-gyro_data.z = (int16_t)(mpu6050_rec_buf[IDX_GYRO_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_ZOUT_L]);
-break;
-case PIOS_MPU60X0_BOTTOM_90DEG:
-gyro_data.y = (int16_t)(mpu6050_rec_buf[IDX_GYRO_YOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_YOUT_L]);
-gyro_data.x = (int16_t)(mpu6050_rec_buf[IDX_GYRO_XOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_XOUT_L]);
-gyro_data.z = (int16_t)(mpu6050_rec_buf[IDX_GYRO_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_ZOUT_L]);
-break;
-case PIOS_MPU60X0_BOTTOM_180DEG:
-gyro_data.y = (int16_t)(mpu6050_rec_buf[IDX_GYRO_XOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_XOUT_L]);
-gyro_data.x = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_YOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_YOUT_L]);
-gyro_data.z = (int16_t)(mpu6050_rec_buf[IDX_GYRO_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_ZOUT_L]);
-break;
-case PIOS_MPU60X0_BOTTOM_270DEG:
-gyro_data.y = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_YOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_YOUT_L]);
-gyro_data.x = - (int16_t)(mpu6050_rec_buf[IDX_GYRO_XOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_XOUT_L]);
-gyro_data.z = (int16_t)(mpu6050_rec_buf[IDX_GYRO_ZOUT_H] << 8 | mpu6050_rec_buf[IDX_GYRO_ZOUT_L]);
-break;
-}
-int32_t raw_temp = (int16_t)(mpu6050_rec_buf[IDX_TEMP_OUT_H] << 8 | mpu6050_rec_buf[IDX_TEMP_OUT_L]);
-float temperature = 35.0f + ((float)raw_temp + 512.0f) / 340.0f;
-// Apply sensor scaling
-float gyro_scale = PIOS_MPU6050_GetGyroScale();
-gyro_data.x *= gyro_scale;
-gyro_data.y *= gyro_scale;
-gyro_data.z *= gyro_scale;
-gyro_data.temperature = temperature;
-PIOS_Queue_Send(pios_mpu6050_dev->gyro_queue, &gyro_data, 0);
-#endif /* PIOS_MPU6050_ACCEL */
-}
-}
-#endif
 /**
 * @}
-* @}
-*/
+*/ /* end of group MPU6050_Library */
